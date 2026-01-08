@@ -38,15 +38,32 @@ jobs:
         # This handles NuGet restore and builds the entire solution
         ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }}
 
+    - name: Display error log on failure
+      if: failure()
+      shell: pwsh
+      run: |
+        $cfg = "${{ matrix.configuration }}".ToLower()
+        $plat = "${{ matrix.platform }}".ToLower()
+        $errorLog = "build.$cfg.$plat.errors.log"
+        if (Test-Path $errorLog) {
+          Write-Host "=== Error Log Contents ==="
+          Get-Content $errorLog | Select-Object -First 100
+        } else {
+          Write-Host "Error log not found: $errorLog"
+        }
+
     - name: Upload build logs on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
         name: build-logs-${{ matrix.platform }}-${{ matrix.configuration }}
         path: |
-          **/*.log
-          **/*.binlog
+          build.*.*.log
+          build.*.*.binlog
+          **/build.*.*.log
+          **/build.*.*.binlog
         retention-days: 7
+        if-no-files-found: warn
 
     - name: Upload build artifacts on success
       if: success() && matrix.configuration == 'Release'

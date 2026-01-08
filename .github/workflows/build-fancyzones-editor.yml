@@ -31,11 +31,10 @@ jobs:
       run: |
         ./tools/build/build-essentials.ps1 -Configuration Debug -Platform x64
 
-    - name: Build FancyZonesEditor
+    - name: Build FancyZonesEditor (C# project only, dependencies already built)
       shell: pwsh
       run: |
-        cd src/modules/fancyzones/editor
-        ../../../../tools/build/build.ps1 -Configuration Debug -Platform "Any CPU"
+        msbuild src/modules/fancyzones/editor/FancyZonesEditor/FancyZonesEditor.csproj /p:Configuration=Debug /p:Platform="Any CPU" /v:minimal
 
     - name: Upload build logs on failure
       if: failure()

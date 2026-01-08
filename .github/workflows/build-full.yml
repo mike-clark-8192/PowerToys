@@ -31,11 +31,18 @@ jobs:
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
 
+    - name: Restore NuGet packages (packages.config style for C++)
+      shell: pwsh
+      run: |
+        # Restore packages.config-style NuGet packages (C++ projects)
+        # MSBuild /t:restore only handles PackageReference, not packages.config
+        nuget restore PowerToys.slnx -ConfigFile nuget.config
+
     - name: Build PowerToys
       shell: pwsh
       run: |
         # Build using PowerToys' official build script
-        # This handles NuGet restore and builds the entire solution
+        # NuGet packages already restored above
         ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }}
 
     - name: Display error log on failure

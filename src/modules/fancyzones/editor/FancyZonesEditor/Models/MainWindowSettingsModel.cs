@@ -196,7 +196,7 @@ namespace FancyZonesEditor
             var orderedKeys = new List<string> { Properties.Resources.Quick_Key_None };
             for (int i = 0; i <= 9; i++)
             {
-                orderedKeys.Add(i.ToString());
+                orderedKeys.Add(i.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
 
             // Build new items list

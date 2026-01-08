@@ -43,7 +43,8 @@ jobs:
       run: |
         # Build using PowerToys' official build script
         # NuGet packages already restored above
-        ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }}
+        # CIBuild=true skips post-build steps that execute binaries (needed for ARM64 cross-compilation)
+        ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }} '/p:CIBuild=true'
 
     - name: Display error log on failure
       if: failure()

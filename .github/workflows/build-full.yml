@@ -1,0 +1,61 @@
+name: Build Full PowerToys
+
+on:
+  push:
+    branches: [ feat/fanzyzones-keyboard-shortcut-qol ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [x64, ARM64]
+        configuration: [Debug, Release]
+      fail-fast: false  # Continue other builds even if one fails
+
+    runs-on: windows-latest
+    timeout-minutes: 90
+    name: Build ${{ matrix.platform }} ${{ matrix.configuration }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+
+    - name: Build PowerToys (using official build script)
+      shell: pwsh
+      run: |
+        # Use PowerToys' own build script which handles restore + build
+        # This builds PowerToys.slnx (entire solution) from repo root
+        ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }}
+
+    - name: Upload build logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-${{ matrix.platform }}-${{ matrix.configuration }}
+        path: |
+          **/*.log
+          **/*.binlog
+        retention-days: 7
+
+    - name: Upload build artifacts on success
+      if: success() && matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: PowerToys-${{ matrix.platform }}-Release
+        path: |
+          x64/Release/**/*.exe
+          x64/Release/**/*.dll
+          ARM64/Release/**/*.exe
+          ARM64/Release/**/*.dll
+        retention-days: 14

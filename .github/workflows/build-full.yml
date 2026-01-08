@@ -31,18 +31,11 @@ jobs:
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
 
-    - name: Restore NuGet packages
+    - name: Build PowerToys
       shell: pwsh
       run: |
-        # Explicitly restore NuGet packages for the full solution
-        nuget restore PowerToys.slnx
-        nuget restore .pipelines/packages.config -SolutionDirectory .
-
-    - name: Build PowerToys (using official build script)
-      shell: pwsh
-      run: |
-        # Use PowerToys' own build script to build (packages already restored)
-        # This builds PowerToys.slnx (entire solution) from repo root
+        # Build using PowerToys' official build script
+        # This handles NuGet restore and builds the entire solution
         ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }}
 
     - name: Upload build logs on failure

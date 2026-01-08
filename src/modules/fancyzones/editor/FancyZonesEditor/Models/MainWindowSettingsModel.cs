@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 using FancyZonesEditor.Models;
@@ -171,6 +172,93 @@ namespace FancyZonesEditor
         }
 
         public static LayoutHotkeysModel LayoutHotkeys { get; } = new LayoutHotkeysModel();
+
+        /// <summary>
+        /// Shared collection of keyboard shortcut options for dropdown binding.
+        /// All layout card dropdowns bind to this single collection.
+        /// </summary>
+        public static ObservableCollection<KeyDisplayItem> QuickKeyOptions { get; } = new ObservableCollection<KeyDisplayItem>();
+
+        /// <summary>
+        /// Regenerates the QuickKeyOptions collection with current assignments.
+        /// Call this after any shortcut assignment change, layout rename, or layout delete.
+        /// </summary>
+        public static void RefreshQuickKeyOptions()
+        {
+            // Build lookup from UUID to layout name
+            var layoutNames = new Dictionary<string, string>();
+            foreach (var model in CustomModels)
+            {
+                layoutNames[model.Uuid] = model.Name;
+            }
+
+            // Explicit ordering: None first, then 0-9
+            var orderedKeys = new List<string> { Properties.Resources.Quick_Key_None };
+            for (int i = 0; i <= 9; i++)
+            {
+                orderedKeys.Add(i.ToString());
+            }
+
+            // Build new items list
+            var newItems = new List<KeyDisplayItem>();
+            foreach (var key in orderedKeys)
+            {
+                if (!LayoutHotkeys.SelectedKeys.TryGetValue(key, out string uuid))
+                {
+                    continue;
+                }
+
+                string displayText;
+                if (key == Properties.Resources.Quick_Key_None)
+                {
+                    displayText = key;
+                }
+                else if (!string.IsNullOrEmpty(uuid) && layoutNames.TryGetValue(uuid, out string layoutName))
+                {
+                    displayText = $"{key} - {layoutName}";
+                }
+                else
+                {
+                    displayText = key;
+                }
+
+                newItems.Add(new KeyDisplayItem(key, displayText));
+            }
+
+            // Update collection in place to minimize UI churn
+            QuickKeyOptions.Clear();
+            foreach (var item in newItems)
+            {
+                QuickKeyOptions.Add(item);
+            }
+        }
+
+        /// <summary>
+        /// Sorts custom layouts by keyboard shortcut.
+        /// Layouts with assigned shortcuts (0-9) appear first, then unassigned layouts.
+        /// Uses Move() to reorder in-place for minimal UI disruption.
+        /// </summary>
+        public static void SortCustomLayouts()
+        {
+            if (CustomModels.Count <= 1)
+            {
+                return;
+            }
+
+            var sorted = CustomModels
+                .OrderBy(m => m.QuickKeySortOrder)
+                .ToList();
+
+            // Use Move() to reorder in-place (less disruptive than Clear/Add)
+            for (int targetIndex = 0; targetIndex < sorted.Count; targetIndex++)
+            {
+                int currentIndex = CustomModels.IndexOf(sorted[targetIndex]);
+                if (currentIndex != targetIndex)
+                {
+                    CustomModels.Move(currentIndex, targetIndex);
+                }
+            }
+        }
 
         public LayoutModel SelectedModel
         {

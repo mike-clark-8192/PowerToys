@@ -141,6 +141,10 @@ namespace FancyZonesEditor
                 MessageBox.Show(parseResult.Message, FancyZonesEditor.Properties.Resources.Error_Parsing_Data_Title, MessageBoxButton.OK);
             }
 
+            // Initialize the shared QuickKeyOptions collection and sort layouts
+            MainWindowSettingsModel.RefreshQuickKeyOptions();
+            MainWindowSettingsModel.SortCustomLayouts();
+
             parseResult = FancyZonesEditorIO.ParseAppliedLayouts();
             if (!parseResult.Result)
             {

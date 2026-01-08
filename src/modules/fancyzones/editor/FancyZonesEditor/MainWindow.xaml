@@ -175,6 +175,33 @@
                             Text="&#xE70F;" />
                     </Button.Content>
                 </Button>
+                <!--  Keyboard shortcut dropdown for custom layouts  -->
+                <StackPanel
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,8,8"
+                    Orientation="Horizontal"
+                    Visibility="{Binding Path=Type, Converter={StaticResource LayoutTypeCustomToVisibilityConverter}}">
+                    <TextBlock
+                        Margin="0,0,4,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
+                        FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                        FontSize="14"
+                        Foreground="{Binding (TextElement.Foreground), RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ContentPresenter}}}"
+                        Text="&#xEDA7;"
+                        ToolTip="{x:Static props:Resources.QuickKey_Title}" />
+                    <ComboBox
+                        MinWidth="50"
+                        AutomationProperties.HelpText="{x:Static props:Resources.QuickKey_Description}"
+                        AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
+                        DisplayMemberPath="DisplayText"
+                        ItemsSource="{x:Static local:MainWindowSettingsModel.QuickKeyOptions}"
+                        SelectedValue="{Binding QuickKey}"
+                        SelectedValuePath="KeyValue"
+                        SelectionChanged="LayoutCard_QuickKeyChanged"
+                        ToolTip="{x:Static props:Resources.QuickKey_Title}" />
+                </StackPanel>
             </Grid>
         </DataTemplate>
 
@@ -514,9 +541,10 @@
                                 AutomationProperties.HelpText="{x:Static props:Resources.QuickKey_Description}"
                                 AutomationProperties.LabeledBy="{Binding ElementName=QuickKeyTitle}"
                                 AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
-                                ItemsSource="{Binding QuickKeysAvailable}"
+                                DisplayMemberPath="DisplayText"
+                                ItemsSource="{x:Static local:MainWindowSettingsModel.QuickKeyOptions}"
                                 KeyDown="ComboBox_KeyDown"
-                                SelectedItem="{Binding QuickKey}" />
+                                SelectedValuePath="KeyValue" />
                         </StackPanel>
 
                     </StackPanel>

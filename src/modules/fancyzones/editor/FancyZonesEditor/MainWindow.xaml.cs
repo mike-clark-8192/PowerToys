@@ -39,6 +39,12 @@ namespace FancyZonesEditor
 
         private bool haveTriedToGetFocusAlready;
 
+        // Guard to prevent SelectionChanged from firing during initialization
+        private bool _isInitializing = true;
+
+        // Stores the original QuickKey value when edit dialog opens (for pending key pattern)
+        private string _originalQuickKeyOnDialogOpen;
+
         private static readonly CompositeFormat EditTemplate = System.Text.CompositeFormat.Parse(Properties.Resources.Edit_Template);
         private static readonly CompositeFormat PixelValue = System.Text.CompositeFormat.Parse(Properties.Resources.Pixel_Value);
         private static readonly CompositeFormat TemplateZoneCountValue = System.Text.CompositeFormat.Parse(Properties.Resources.Template_Zone_Count_Value);
@@ -345,6 +351,11 @@ namespace FancyZonesEditor
 
             App.Overlay.StartEditing(_settings.SelectedModel);
 
+            // Store the original QuickKey and initialize the dialog ComboBox
+            var layout = (LayoutModel)dataContext;
+            _originalQuickKeyOnDialogOpen = layout.QuickKey;
+            quickKeySelectionComboBox.SelectedValue = layout.QuickKey;
+
             Keyboard.ClearFocus();
             EditLayoutDialogTitle.Text = string.Format(CultureInfo.CurrentCulture, EditTemplate, ((LayoutModel)dataContext).Name);
             await EditLayoutDialog.ShowAsync();
@@ -423,6 +434,9 @@ namespace FancyZonesEditor
             }
 
             InvalidateVisual();
+
+            // Mark initialization complete - enables SelectionChanged handlers
+            _isInitializing = false;
         }
 
         // EditLayout: Cancel changes
@@ -439,6 +453,17 @@ namespace FancyZonesEditor
 
             App.Overlay.EndEditing(null);
             LayoutModel model = _settings.SelectedModel;
+
+            // Handle keyboard shortcut change with swap logic
+            var newQuickKey = quickKeySelectionComboBox.SelectedValue as string;
+            if (newQuickKey != null && newQuickKey != _originalQuickKeyOnDialogOpen)
+            {
+                PerformShortcutSwap(model, _originalQuickKeyOnDialogOpen, newQuickKey);
+                MainWindowSettingsModel.SortCustomLayouts();
+            }
+
+            // Refresh dropdown options (layout name may have changed)
+            MainWindowSettingsModel.RefreshQuickKeyOptions();
 
             // update current settings
             if (model == _settings.AppliedModel)
@@ -491,6 +516,10 @@ namespace FancyZonesEditor
                 }
 
                 model.Delete();
+
+                // Refresh dropdown options since layout was deleted
+                MainWindowSettingsModel.RefreshQuickKeyOptions();
+
                 App.FancyZonesEditorIO.SerializeAppliedLayouts();
                 App.FancyZonesEditorIO.SerializeCustomLayouts();
                 App.FancyZonesEditorIO.SerializeDefaultLayouts();
@@ -543,6 +572,64 @@ namespace FancyZonesEditor
             }
         }
 
+        private void LayoutCard_QuickKeyChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Guard: ignore events during initialization or with no actual change
+            if (_isInitializing || e.AddedItems.Count == 0 || e.RemovedItems.Count == 0)
+            {
+                return;
+            }
+
+            var comboBox = sender as ComboBox;
+            var layout = comboBox?.DataContext as LayoutModel;
+            var newItem = e.AddedItems[0] as KeyDisplayItem;
+            var oldItem = e.RemovedItems[0] as KeyDisplayItem;
+
+            if (layout == null || newItem == null || oldItem == null)
+            {
+                return;
+            }
+
+            if (newItem.KeyValue == oldItem.KeyValue)
+            {
+                return; // No actual change
+            }
+
+            // Perform swap if needed (using two SelectKey calls)
+            PerformShortcutSwap(layout, oldItem.KeyValue, newItem.KeyValue);
+
+            // Refresh dropdown display texts
+            MainWindowSettingsModel.RefreshQuickKeyOptions();
+
+            // Re-sort custom layouts
+            MainWindowSettingsModel.SortCustomLayouts();
+
+            // Serialize immediately
+            App.FancyZonesEditorIO.SerializeLayoutHotkeys();
+        }
+
+        private void PerformShortcutSwap(LayoutModel layout, string oldKey, string newKey)
+        {
+            var hotkeys = MainWindowSettingsModel.LayoutHotkeys;
+            string noneKey = Properties.Resources.Quick_Key_None;
+
+            // Find if newKey is assigned to another layout
+            string otherLayoutUuid = null;
+            if (newKey != noneKey && hotkeys.SelectedKeys.TryGetValue(newKey, out var uuid) && !string.IsNullOrEmpty(uuid))
+            {
+                otherLayoutUuid = uuid;
+            }
+
+            if (!string.IsNullOrEmpty(otherLayoutUuid) && otherLayoutUuid != layout.Uuid)
+            {
+                // Swap: give old key to the other layout
+                hotkeys.SelectKey(oldKey, otherLayoutUuid);
+            }
+
+            // Assign new key to current layout
+            hotkeys.SelectKey(newKey, layout.Uuid);
+        }
+
         private void TextBox_GotKeyboardFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox tb)
@@ -563,7 +650,7 @@ namespace FancyZonesEditor
 
         private void SettingsBtn_Click(object sender, RoutedEventArgs e)
         {
-            SettingsDeepLink.OpenSettings(SettingsDeepLink.SettingsWindow.FancyZones);
+            SettingsDeepLink.OpenSettings(SettingsDeepLink.SettingsWindow.FancyZones, false);
         }
 
         private void EditLayoutDialogTitle_Loaded(object sender, RoutedEventArgs e)

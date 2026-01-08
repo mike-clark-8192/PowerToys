@@ -274,11 +274,26 @@ namespace FancyZonesEditor.Models
                     }
 
                     FirePropertyChanged(nameof(QuickKey));
+                    FirePropertyChanged(nameof(QuickKeySortOrder));
                 }
             }
         }
 
         private int _quickKey = -1;
+
+        /// <summary>
+        /// Returns a sortable value for ordering layouts by keyboard shortcut.
+        /// Layouts with assigned shortcuts (0-9) sort first, unassigned layouts sort last.
+        /// </summary>
+        public int QuickKeySortOrder
+        {
+            get
+            {
+                // _quickKey is -1 for unassigned, 0-9 for assigned
+                // Return the key value for assigned, int.MaxValue for unassigned
+                return _quickKey == -1 ? int.MaxValue : _quickKey;
+            }
+        }
 
         // TemplateZoneCount - number of zones selected in the picker window for template layouts
         public int TemplateZoneCount

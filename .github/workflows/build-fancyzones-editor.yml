@@ -34,7 +34,7 @@ jobs:
     - name: Build FancyZonesEditor (C# project only, dependencies already built)
       shell: pwsh
       run: |
-        msbuild src/modules/fancyzones/editor/FancyZonesEditor/FancyZonesEditor.csproj /p:Configuration=Debug /p:Platform="Any CPU" /v:minimal
+        msbuild src/modules/fancyzones/editor/FancyZonesEditor/FancyZonesEditor.csproj /p:Configuration=Debug /p:Platform=x64 /v:minimal
 
     - name: Upload build logs on failure
       if: failure()

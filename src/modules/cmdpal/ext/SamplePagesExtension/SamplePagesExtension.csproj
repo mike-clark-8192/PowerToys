@@ -63,7 +63,8 @@
   </PropertyGroup>
 
   <!-- Only enable Native AOT for Release builds to avoid System.Private.CoreLib.dll version conflicts during development -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+  <!-- Also disable for CI builds (CIBuild=true) to avoid trimming errors with Windows SDK -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(CIBuild)' != 'true'">
     <PublishTrimmed>true</PublishTrimmed>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishAot>true</PublishAot>

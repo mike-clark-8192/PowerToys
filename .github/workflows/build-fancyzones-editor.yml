@@ -35,7 +35,7 @@ jobs:
       shell: pwsh
       run: |
         cd src/modules/fancyzones/editor
-        ../../../../tools/build/build.ps1 -Configuration Debug
+        ../../../../tools/build/build.ps1 -Configuration Debug -Platform "Any CPU"
 
     - name: Upload build logs on failure
       if: failure()

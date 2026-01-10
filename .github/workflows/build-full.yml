@@ -97,9 +97,11 @@ jobs:
 
     - name: Build Installer - Machine MSI
       shell: pwsh
+      env:
+        # Environment variable to skip IIDOptimizer which fails in CI
+        CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build MSI for machine-wide installation
-        # CsWinRTIIDOptimizerOptOut=true skips IIDOptimizer which fails in CI
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysInstallerVNext `
           /p:Platform=$env:BUILD_PLATFORM `
@@ -114,6 +116,8 @@ jobs:
 
     - name: Build Installer - User MSI
       shell: pwsh
+      env:
+        CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build MSI for per-user installation
         msbuild installer/PowerToysSetup.slnx `
@@ -129,6 +133,8 @@ jobs:
 
     - name: Build Installer - Machine Bootstrapper
       shell: pwsh
+      env:
+        CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build EXE bootstrapper for machine-wide installation
         msbuild installer/PowerToysSetup.slnx `
@@ -144,6 +150,8 @@ jobs:
 
     - name: Build Installer - User Bootstrapper
       shell: pwsh
+      env:
+        CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build EXE bootstrapper for per-user installation
         msbuild installer/PowerToysSetup.slnx `

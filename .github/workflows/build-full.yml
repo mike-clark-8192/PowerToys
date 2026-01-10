@@ -28,6 +28,27 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    - name: Install Windows SDK 10.0.19041.0
+      shell: pwsh
+      run: |
+        # CsWinRT requires Windows SDK 10.0.19041.0 for TargetPlatformMinVersion validation
+        # Install it via VS Installer (required for installer builds)
+        $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsPath = & $vsWhere -latest -property installationPath
+        $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+
+        Write-Host "Installing Windows SDK 10.0.19041.0..."
+        & $vsInstaller modify --installPath $vsPath --add Microsoft.VisualStudio.Component.Windows10SDK.19041 --quiet --norestart --wait
+
+        Write-Host "Verifying SDK installation..."
+        $sdkPath = "C:\Program Files (x86)\Windows Kits\10\Platforms\UAP\10.0.19041.0"
+        if (Test-Path $sdkPath) {
+          Write-Host "SDK 10.0.19041.0 installed successfully"
+        } else {
+          Write-Host "Warning: SDK path not found at $sdkPath"
+          Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Platforms\UAP\" -ErrorAction SilentlyContinue
+        }
+
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
 

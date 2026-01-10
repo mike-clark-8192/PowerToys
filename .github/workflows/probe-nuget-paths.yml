@@ -1,0 +1,84 @@
+name: Probe NuGet Paths
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Check NuGet environment
+      shell: pwsh
+      run: |
+        Write-Host "=== Environment Variables ==="
+        Write-Host "NUGET_PACKAGES: $env:NUGET_PACKAGES"
+        Write-Host "USERPROFILE: $env:USERPROFILE"
+        Write-Host "HOME: $env:HOME"
+
+        Write-Host "`n=== Default NuGet paths ==="
+        $defaultCache = Join-Path $env:USERPROFILE ".nuget\packages"
+        Write-Host "Default cache path: $defaultCache"
+        Write-Host "Exists: $(Test-Path $defaultCache)"
+
+        Write-Host "`n=== Check C:\NuGetPackages (MS Azure path) ==="
+        Write-Host "Exists: $(Test-Path 'C:\NuGetPackages')"
+
+        Write-Host "`n=== dotnet nuget locals ==="
+        dotnet nuget locals all --list
+
+        Write-Host "`n=== Quick NuGet restore test ==="
+        # Create a minimal packages.config
+        @'
+        <?xml version="1.0" encoding="utf-8"?>
+        <packages>
+          <package id="WixToolset.WcaUtil" version="5.0.2" />
+        </packages>
+        '@ | Set-Content test-packages.config
+
+        nuget restore test-packages.config -PackagesDirectory test-packages
+        Write-Host "`n=== Local restore went to: ==="
+        Get-ChildItem test-packages -ErrorAction SilentlyContinue
+
+        Write-Host "`n=== MSBuild restore (how we actually restore) ==="
+        # Create a minimal csproj that references the WiX package
+        @'
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net8.0</TargetFramework>
+          </PropertyGroup>
+          <ItemGroup>
+            <PackageReference Include="WixToolset.WcaUtil" Version="5.0.2" />
+          </ItemGroup>
+        </Project>
+        '@ | Set-Content test-restore.csproj
+
+        dotnet restore test-restore.csproj
+
+        Write-Host "`n=== After dotnet restore, check paths ==="
+        Write-Host "NUGET_PACKAGES after restore: $env:NUGET_PACKAGES"
+
+        $possiblePaths = @(
+          $env:NUGET_PACKAGES,
+          "C:\NuGetPackages",
+          "$env:USERPROFILE\.nuget\packages",
+          "C:\Users\runneradmin\.nuget\packages"
+        )
+
+        foreach ($p in $possiblePaths) {
+          if ($p -and (Test-Path $p)) {
+            Write-Host "`nFound packages at: $p"
+            $wixPath = Join-Path $p "wixtoolset.wcautil"
+            if (Test-Path $wixPath) {
+              Write-Host "  WixToolset.WcaUtil found!"
+              Get-ChildItem $wixPath -Recurse -Filter "*.lib" | ForEach-Object { Write-Host "    $_" }
+            }
+          }
+        }
+
+        Write-Host "`n=== Recommended NUGET_PACKAGES value ==="
+        if (Test-Path "$env:USERPROFILE\.nuget\packages\wixtoolset.wcautil") {
+          Write-Host "Use: `${{ env.USERPROFILE }}\.nuget\packages"
+          Write-Host "Or hardcoded: $env:USERPROFILE\.nuget\packages"
+        }

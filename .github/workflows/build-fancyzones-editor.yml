@@ -2,7 +2,7 @@ name: Build FancyZones Editor
 
 on:
   push:
-    branches: [ feat/fanzyzones-keyboard-shortcut-qol ]
+    branches: [ feat/fancyzones-keyboard-shortcut-qol ]
     paths:
       - 'src/modules/fancyzones/editor/**'
       - '.github/workflows/build-fancyzones-editor.yml'

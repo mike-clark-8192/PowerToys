@@ -3,7 +3,7 @@ name: Probe NuGet Paths
 on:
   workflow_dispatch:
   push:
-    branches: [ feat/fanzyzones-keyboard-shortcut-qol ]
+    branches: [ feat/fancyzones-keyboard-shortcut-qol ]
     paths: [ '.github/workflows/probe-nuget-paths.yml' ]
 
 jobs:

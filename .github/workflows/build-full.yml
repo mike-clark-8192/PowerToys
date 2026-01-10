@@ -2,7 +2,7 @@ name: Build Full PowerToys
 
 on:
   push:
-    branches: [ feat/fanzyzones-keyboard-shortcut-qol ]
+    branches: [ feat/fancyzones-keyboard-shortcut-qol ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # Allow manual trigger
@@ -68,6 +68,28 @@ jobs:
         # Build using PowerToys' official build script
         # CIBuild=true skips post-build steps that execute binaries
         ./tools/build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Platform $env:BUILD_PLATFORM '/p:CIBuild=true'
+
+    - name: Build BugReportTool
+      shell: pwsh
+      run: |
+        # BugReportTool is a separate solution not included in main build
+        msbuild tools/BugReportTool/BugReportTool.sln `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:CIBuild=true `
+          -restore `
+          /verbosity:minimal
+
+    - name: Build StylesReportTool
+      shell: pwsh
+      run: |
+        # StylesReportTool is a separate solution not included in main build
+        msbuild tools/StylesReportTool/StylesReportTool.sln `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:CIBuild=true `
+          -restore `
+          /verbosity:minimal
 
     - name: Patch installer scripts for PowerShell compatibility
       shell: pwsh

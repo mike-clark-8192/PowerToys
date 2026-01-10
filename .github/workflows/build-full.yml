@@ -7,17 +7,16 @@ on:
     branches: [ main ]
   workflow_dispatch:  # Allow manual trigger
 
+env:
+  BUILD_PLATFORM: x64
+  BUILD_CONFIGURATION: Release
+  VERSION_NUMBER: 0.0.1-dev
+
 jobs:
   build:
-    strategy:
-      matrix:
-        platform: [x64, ARM64]
-        configuration: [Debug, Release]
-      fail-fast: false  # Continue other builds even if one fails
-
     runs-on: windows-latest
-    timeout-minutes: 90
-    name: Build ${{ matrix.platform }} ${{ matrix.configuration }}
+    timeout-minutes: 120
+    name: Build x64 Release + Installer
 
     steps:
     - name: Checkout code
@@ -31,28 +30,106 @@ jobs:
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
 
+    - name: Install WiX 5.0.2 tools
+      run: dotnet tool install --global wix --version 5.0.2
+
     - name: Restore NuGet packages (packages.config style for C++)
       shell: pwsh
       run: |
         # Restore packages.config-style NuGet packages (C++ projects)
-        # MSBuild /t:restore only handles PackageReference, not packages.config
         nuget restore PowerToys.slnx -ConfigFile nuget.config
 
     - name: Build PowerToys
       shell: pwsh
       run: |
         # Build using PowerToys' official build script
-        # NuGet packages already restored above
-        # CIBuild=true skips post-build steps that execute binaries (needed for ARM64 cross-compilation)
-        ./tools/build/build.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }} '/p:CIBuild=true'
+        # CIBuild=true skips post-build steps that execute binaries
+        ./tools/build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Platform $env:BUILD_PLATFORM '/p:CIBuild=true'
+
+    - name: Build Installer - Custom Actions DLLs
+      shell: pwsh
+      run: |
+        # Build shared support DLLs first (CustomActions and SilentFilesInUseBAFunction)
+        # RunBuildEvents=true generates the .wxs files with component lists
+        msbuild installer/PowerToysSetup.slnx `
+          /t:PowerToysSetupCustomActionsVNext`;SilentFilesInUseBAFunction `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:RunBuildEvents=true `
+          /p:RestorePackagesConfig=true `
+          /p:CIBuild=true `
+          -restore -graph `
+          /verbosity:minimal
+
+    - name: Build Installer - Machine MSI
+      shell: pwsh
+      run: |
+        # Build MSI for machine-wide installation
+        msbuild installer/PowerToysSetup.slnx `
+          /t:PowerToysInstallerVNext `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:RunBuildEvents=false `
+          /p:PerUser=false `
+          /p:BuildProjectReferences=false `
+          /p:CIBuild=true `
+          -restore `
+          /verbosity:minimal
+
+    - name: Build Installer - User MSI
+      shell: pwsh
+      run: |
+        # Build MSI for per-user installation
+        msbuild installer/PowerToysSetup.slnx `
+          /t:PowerToysInstallerVNext `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:RunBuildEvents=false `
+          /p:PerUser=true `
+          /p:BuildProjectReferences=false `
+          /p:CIBuild=true `
+          /verbosity:minimal
+
+    - name: Build Installer - Machine Bootstrapper
+      shell: pwsh
+      run: |
+        # Build EXE bootstrapper for machine-wide installation
+        msbuild installer/PowerToysSetup.slnx `
+          /t:PowerToysBootstrapperVNext `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:PerUser=false `
+          /p:BuildProjectReferences=false `
+          /p:CIBuild=true `
+          -restore `
+          /verbosity:minimal
+
+    - name: Build Installer - User Bootstrapper
+      shell: pwsh
+      run: |
+        # Build EXE bootstrapper for per-user installation
+        msbuild installer/PowerToysSetup.slnx `
+          /t:PowerToysBootstrapperVNext `
+          /p:Platform=$env:BUILD_PLATFORM `
+          /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:PerUser=true `
+          /p:BuildProjectReferences=false `
+          /p:CIBuild=true `
+          /verbosity:minimal
+
+    - name: List installer outputs
+      shell: pwsh
+      run: |
+        Write-Host "=== Machine Installer ==="
+        Get-ChildItem -Path "installer/PowerToysSetupVNext/$env:BUILD_PLATFORM/$env:BUILD_CONFIGURATION/MachineSetup" -ErrorAction SilentlyContinue
+        Write-Host "`n=== User Installer ==="
+        Get-ChildItem -Path "installer/PowerToysSetupVNext/$env:BUILD_PLATFORM/$env:BUILD_CONFIGURATION/UserSetup" -ErrorAction SilentlyContinue
 
     - name: Display error log on failure
       if: failure()
       shell: pwsh
       run: |
-        $cfg = "${{ matrix.configuration }}".ToLower()
-        $plat = "${{ matrix.platform }}".ToLower()
-        $errorLog = "build.$cfg.$plat.errors.log"
+        $errorLog = "build.release.x64.errors.log"
         if (Test-Path $errorLog) {
           Write-Host "=== Error Log Contents ==="
           Get-Content $errorLog | Select-Object -First 100
@@ -64,7 +141,7 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: build-logs-${{ matrix.platform }}-${{ matrix.configuration }}
+        name: build-logs
         path: |
           build.*.*.log
           build.*.*.binlog
@@ -73,14 +150,14 @@ jobs:
         retention-days: 7
         if-no-files-found: warn
 
-    - name: Upload build artifacts on success
-      if: success() && matrix.configuration == 'Release'
+    - name: Upload Installer artifacts
+      if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: PowerToys-${{ matrix.platform }}-Release
+        name: PowerToys-Installers-x64
         path: |
-          x64/Release/**/*.exe
-          x64/Release/**/*.dll
-          ARM64/Release/**/*.exe
-          ARM64/Release/**/*.dll
+          installer/PowerToysSetupVNext/x64/Release/MachineSetup/*.msi
+          installer/PowerToysSetupVNext/x64/Release/MachineSetup/*.exe
+          installer/PowerToysSetupVNext/x64/Release/UserSetup/*.msi
+          installer/PowerToysSetupVNext/x64/Release/UserSetup/*.exe
         retention-days: 14

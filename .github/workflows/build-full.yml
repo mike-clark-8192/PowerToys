@@ -107,6 +107,21 @@ jobs:
         New-Item -ItemType Directory -Force -Path $dscModulesPath
         Write-Host "Created DSC placeholders at $dscPath and $dscModulesPath"
 
+        # Patch WiX files to add Name attributes (WiX 5 requires them when Source uses variables)
+        $dscWxsPath = "installer\PowerToysSetupVNext\DscResources.wxs"
+        $content = Get-Content $dscWxsPath -Raw
+        $content = $content -replace 'Id="PTConfReference.psd1" />', 'Id="PTConfReference.psd1" Name="Microsoft.PowerToys.Configure.psd1" />'
+        $content = $content -replace 'Id="PTConfReference.psm1" />', 'Id="PTConfReference.psm1" Name="Microsoft.PowerToys.Configure.psm1" />'
+        Set-Content -Path $dscWxsPath -Value $content -NoNewline
+        Write-Host "Patched $dscWxsPath"
+
+        $coreWxsPath = "installer\PowerToysSetupVNext\Core.wxs"
+        $content = Get-Content $coreWxsPath -Raw
+        $content = $content -replace 'Id="PTConf.psd1" />', 'Id="PTConf.psd1" Name="Microsoft.PowerToys.Configure.psd1" />'
+        $content = $content -replace 'Id="PTConf.psm1" />', 'Id="PTConf.psm1" Name="Microsoft.PowerToys.Configure.psm1" />'
+        Set-Content -Path $coreWxsPath -Value $content -NoNewline
+        Write-Host "Patched $coreWxsPath with explicit Name attributes"
+
     - name: Build Installer - Custom Actions DLLs
       shell: pwsh
       run: |

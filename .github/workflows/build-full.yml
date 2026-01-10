@@ -93,13 +93,17 @@ jobs:
         # DSC module generation requires running PowerToys.DSC.exe which is complex
         # Create placeholder structure for installer to proceed
         $version = $env:VERSION_NUMBER.TrimEnd('-dev')
-        $dscPath = "src/dsc/Microsoft.PowerToys.Configure/Generated/Microsoft.PowerToys.Configure/$version.0"
+        Write-Host "VERSION_NUMBER=$env:VERSION_NUMBER, version=$version"
+        $dscPath = "src\dsc\Microsoft.PowerToys.Configure\Generated\Microsoft.PowerToys.Configure\$version.0"
+        Write-Host "Creating DSC path: $dscPath"
         New-Item -ItemType Directory -Force -Path $dscPath
         # Create minimal placeholder files (installer will include them but they won't be functional)
-        "# Placeholder - DSC not generated in CI build" | Set-Content "$dscPath/Microsoft.PowerToys.Configure.psd1"
-        "# Placeholder - DSC not generated in CI build" | Set-Content "$dscPath/Microsoft.PowerToys.Configure.psm1"
+        "# Placeholder - DSC not generated in CI build" | Set-Content "$dscPath\Microsoft.PowerToys.Configure.psd1"
+        "# Placeholder - DSC not generated in CI build" | Set-Content "$dscPath\Microsoft.PowerToys.Configure.psm1"
+        Write-Host "DSC placeholder files:"
+        Get-ChildItem $dscPath
         # Create DSCModules output directory
-        $dscModulesPath = "$env:BUILD_PLATFORM/Release/DSCModules"
+        $dscModulesPath = "$env:BUILD_PLATFORM\Release\DSCModules"
         New-Item -ItemType Directory -Force -Path $dscModulesPath
         Write-Host "Created DSC placeholders at $dscPath and $dscModulesPath"
 
@@ -108,10 +112,12 @@ jobs:
       run: |
         # Build shared support DLLs first (CustomActions and SilentFilesInUseBAFunction)
         # RunBuildEvents=true generates the .wxs files with component lists
+        $version = $env:VERSION_NUMBER.TrimEnd('-dev')
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysSetupCustomActionsVNext`;SilentFilesInUseBAFunction `
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:Version=$version `
           /p:RunBuildEvents=true `
           /p:RestorePackagesConfig=true `
           /p:CIBuild=true `
@@ -125,10 +131,12 @@ jobs:
         CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build MSI for machine-wide installation
+        $version = $env:VERSION_NUMBER.TrimEnd('-dev')
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysInstallerVNext `
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:Version=$version `
           /p:RunBuildEvents=false `
           /p:PerUser=false `
           /p:BuildProjectReferences=false `
@@ -143,10 +151,12 @@ jobs:
         CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build MSI for per-user installation
+        $version = $env:VERSION_NUMBER.TrimEnd('-dev')
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysInstallerVNext `
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:Version=$version `
           /p:RunBuildEvents=false `
           /p:PerUser=true `
           /p:BuildProjectReferences=false `
@@ -160,10 +170,12 @@ jobs:
         CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build EXE bootstrapper for machine-wide installation
+        $version = $env:VERSION_NUMBER.TrimEnd('-dev')
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysBootstrapperVNext `
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:Version=$version `
           /p:PerUser=false `
           /p:BuildProjectReferences=false `
           /p:CIBuild=true `
@@ -177,10 +189,12 @@ jobs:
         CsWinRTIIDOptimizerOptOut: true
       run: |
         # Build EXE bootstrapper for per-user installation
+        $version = $env:VERSION_NUMBER.TrimEnd('-dev')
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysBootstrapperVNext `
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
+          /p:Version=$version `
           /p:PerUser=true `
           /p:BuildProjectReferences=false `
           /p:CIBuild=true `

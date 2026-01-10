@@ -130,16 +130,20 @@ jobs:
         # Patch WiX files to add Name attributes AFTER generateAllFileComponents.ps1 runs
         # WiX 5 requires explicit Name when Source uses variables
         $dscWxsPath = "installer\PowerToysSetupVNext\DscResources.wxs"
-        Write-Host "=== DscResources.wxs before patching (lines 10-30) ==="
-        Get-Content $dscWxsPath | Select-Object -Skip 9 -First 21 | ForEach-Object { $i = 10 + $_.ReadCount - 1; "$i`: $_" }
-
         $content = Get-Content $dscWxsPath -Raw
+
+        # Add Name attributes to DSC file references
         $content = $content -replace 'Id="PTConfReference.psd1" />', 'Id="PTConfReference.psd1" Name="Microsoft.PowerToys.Configure.psd1" />'
         $content = $content -replace 'Id="PTConfReference.psm1" />', 'Id="PTConfReference.psm1" Name="Microsoft.PowerToys.Configure.psm1" />'
-        Set-Content -Path $dscWxsPath -Value $content -NoNewline
 
-        Write-Host "=== DscResources.wxs after patching (lines 10-30) ==="
-        Get-Content $dscWxsPath | Select-Object -Skip 9 -First 21
+        # Remove the invalid empty DscJsonFiles component generated when DSCModules folder is empty
+        # The script generates: <File Id="DscJsonFiles_File_" Source="$(var.DscJsonFilesPath)\" /> which is invalid
+        $content = $content -replace '(?s)<Component Id="DscJsonFiles_Component"[^>]*>.*?</Component>\s*', ''
+        # Also remove the ComponentRef for it
+        $content = $content -replace '<ComponentRef Id="DscJsonFiles_Component"\s*/>\s*', ''
+
+        Set-Content -Path $dscWxsPath -Value $content -NoNewline
+        Write-Host "Patched $dscWxsPath"
 
         $coreWxsPath = "installer\PowerToysSetupVNext\Core.wxs"
         $content = Get-Content $coreWxsPath -Raw

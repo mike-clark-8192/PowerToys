@@ -25,6 +25,21 @@ jobs:
       with:
         submodules: recursive
 
+    # Snapshot filesystem before build to measure side effects
+    - name: Snapshot filesystem (before build)
+      shell: pwsh
+      run: |
+        $outFile = "$env:GITHUB_WORKSPACE\fs-before.txt"
+        # Enumerate all drives and list all files
+        Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+          $drive = $_.Root
+          Write-Host "Scanning $drive ..."
+          Get-ChildItem -Path $drive -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object { "$($_.Length)`t$($_.FullName)" }
+        } | Out-File -FilePath $outFile -Encoding utf8
+        $lines = (Get-Content $outFile | Measure-Object -Line).Lines
+        Write-Host "Captured $lines files"
+
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
@@ -77,6 +92,7 @@ jobs:
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
           /p:CIBuild=true `
+          /p:RestorePackagesConfig=true `
           -restore `
           /verbosity:minimal
 
@@ -88,6 +104,7 @@ jobs:
           /p:Platform=$env:BUILD_PLATFORM `
           /p:Configuration=$env:BUILD_CONFIGURATION `
           /p:CIBuild=true `
+          /p:RestorePackagesConfig=true `
           -restore `
           /verbosity:minimal
 
@@ -258,6 +275,32 @@ jobs:
         Get-ChildItem -Path "installer/PowerToysSetupVNext/$env:BUILD_PLATFORM/$env:BUILD_CONFIGURATION/MachineSetup" -ErrorAction SilentlyContinue
         Write-Host "`n=== User Installer ==="
         Get-ChildItem -Path "installer/PowerToysSetupVNext/$env:BUILD_PLATFORM/$env:BUILD_CONFIGURATION/UserSetup" -ErrorAction SilentlyContinue
+
+    # Snapshot filesystem after build to compare with before
+    - name: Snapshot filesystem (after build)
+      if: always()
+      shell: pwsh
+      run: |
+        $outFile = "$env:GITHUB_WORKSPACE\fs-after.txt"
+        Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+          $drive = $_.Root
+          Write-Host "Scanning $drive ..."
+          Get-ChildItem -Path $drive -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object { "$($_.Length)`t$($_.FullName)" }
+        } | Out-File -FilePath $outFile -Encoding utf8
+        $lines = (Get-Content $outFile | Measure-Object -Line).Lines
+        Write-Host "Captured $lines files"
+
+    - name: Upload filesystem snapshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: filesystem-snapshots
+        path: |
+          fs-before.txt
+          fs-after.txt
+        compression-level: 9
+        retention-days: 7
 
     - name: Display error log on failure
       if: failure()

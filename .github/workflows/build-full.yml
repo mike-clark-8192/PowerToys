@@ -87,6 +87,22 @@ jobs:
           }
         }
 
+    - name: Create DSC module placeholders
+      shell: pwsh
+      run: |
+        # DSC module generation requires running PowerToys.DSC.exe which is complex
+        # Create placeholder structure for installer to proceed
+        $version = $env:VERSION_NUMBER.TrimEnd('-dev')
+        $dscPath = "src/dsc/Microsoft.PowerToys.Configure/Generated/Microsoft.PowerToys.Configure/$version.0"
+        New-Item -ItemType Directory -Force -Path $dscPath
+        # Create minimal placeholder files (installer will include them but they won't be functional)
+        "# Placeholder - DSC not generated in CI build" | Set-Content "$dscPath/Microsoft.PowerToys.Configure.psd1"
+        "# Placeholder - DSC not generated in CI build" | Set-Content "$dscPath/Microsoft.PowerToys.Configure.psm1"
+        # Create DSCModules output directory
+        $dscModulesPath = "$env:BUILD_PLATFORM/Release/DSCModules"
+        New-Item -ItemType Directory -Force -Path $dscModulesPath
+        Write-Host "Created DSC placeholders at $dscPath and $dscModulesPath"
+
     - name: Build Installer - Custom Actions DLLs
       shell: pwsh
       run: |

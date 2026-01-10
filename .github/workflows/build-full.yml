@@ -99,6 +99,7 @@ jobs:
       shell: pwsh
       run: |
         # Build MSI for machine-wide installation
+        # CsWinRTIIDOptimizerOptOut=true skips IIDOptimizer which fails in CI
         msbuild installer/PowerToysSetup.slnx `
           /t:PowerToysInstallerVNext `
           /p:Platform=$env:BUILD_PLATFORM `
@@ -107,6 +108,7 @@ jobs:
           /p:PerUser=false `
           /p:BuildProjectReferences=false `
           /p:CIBuild=true `
+          /p:CsWinRTIIDOptimizerOptOut=true `
           -restore `
           /verbosity:minimal
 
@@ -122,6 +124,7 @@ jobs:
           /p:PerUser=true `
           /p:BuildProjectReferences=false `
           /p:CIBuild=true `
+          /p:CsWinRTIIDOptimizerOptOut=true `
           /verbosity:minimal
 
     - name: Build Installer - Machine Bootstrapper
@@ -135,6 +138,7 @@ jobs:
           /p:PerUser=false `
           /p:BuildProjectReferences=false `
           /p:CIBuild=true `
+          /p:CsWinRTIIDOptimizerOptOut=true `
           -restore `
           /verbosity:minimal
 
@@ -149,6 +153,7 @@ jobs:
           /p:PerUser=true `
           /p:BuildProjectReferences=false `
           /p:CIBuild=true `
+          /p:CsWinRTIIDOptimizerOptOut=true `
           /verbosity:minimal
 
     - name: List installer outputs

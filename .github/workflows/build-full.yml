@@ -69,16 +69,23 @@ jobs:
         # CIBuild=true skips post-build steps that execute binaries
         ./tools/build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Platform $env:BUILD_PLATFORM '/p:CIBuild=true'
 
-    - name: Patch installer script for PowerShell compatibility
+    - name: Patch installer scripts for PowerShell compatibility
       shell: pwsh
       run: |
         # Fix New-Guid cmdlet issue - use [Guid]::NewGuid() which works in all PS versions
         # The MSBuild pre-build event uses powershell.exe which may have issues with New-Guid
-        $scriptPath = "installer/PowerToysSetupVNext/generateAllFileComponents.ps1"
-        $content = Get-Content $scriptPath -Raw
-        $content = $content -replace '\(New-Guid\)', '([Guid]::NewGuid())'
-        Set-Content -Path $scriptPath -Value $content -NoNewline
-        Write-Host "Patched $scriptPath for PowerShell compatibility"
+        $scripts = @(
+          "installer/PowerToysSetupVNext/generateAllFileComponents.ps1",
+          "installer/PowerToysSetupVNext/generateMonacoWxs.ps1"
+        )
+        foreach ($scriptPath in $scripts) {
+          if (Test-Path $scriptPath) {
+            $content = Get-Content $scriptPath -Raw
+            $content = $content -replace '\(New-Guid\)', '([Guid]::NewGuid())'
+            Set-Content -Path $scriptPath -Value $content -NoNewline
+            Write-Host "Patched $scriptPath for PowerShell compatibility"
+          }
+        }
 
     - name: Build Installer - Custom Actions DLLs
       shell: pwsh

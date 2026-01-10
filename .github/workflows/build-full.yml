@@ -11,6 +11,7 @@ env:
   BUILD_PLATFORM: x64
   BUILD_CONFIGURATION: Release
   VERSION_NUMBER: 0.0.1-dev
+  NUGET_PACKAGES: C:\Users\runneradmin\.nuget\packages
 
 jobs:
   build:

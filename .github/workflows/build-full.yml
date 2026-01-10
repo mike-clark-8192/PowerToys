@@ -130,18 +130,23 @@ jobs:
         # Patch WiX files to add Name attributes AFTER generateAllFileComponents.ps1 runs
         # WiX 5 requires explicit Name when Source uses variables
         $dscWxsPath = "installer\PowerToysSetupVNext\DscResources.wxs"
+        Write-Host "=== DscResources.wxs before patching (lines 10-30) ==="
+        Get-Content $dscWxsPath | Select-Object -Skip 9 -First 21 | ForEach-Object { $i = 10 + $_.ReadCount - 1; "$i`: $_" }
+
         $content = Get-Content $dscWxsPath -Raw
         $content = $content -replace 'Id="PTConfReference.psd1" />', 'Id="PTConfReference.psd1" Name="Microsoft.PowerToys.Configure.psd1" />'
         $content = $content -replace 'Id="PTConfReference.psm1" />', 'Id="PTConfReference.psm1" Name="Microsoft.PowerToys.Configure.psm1" />'
         Set-Content -Path $dscWxsPath -Value $content -NoNewline
-        Write-Host "Patched $dscWxsPath"
+
+        Write-Host "=== DscResources.wxs after patching (lines 10-30) ==="
+        Get-Content $dscWxsPath | Select-Object -Skip 9 -First 21
 
         $coreWxsPath = "installer\PowerToysSetupVNext\Core.wxs"
         $content = Get-Content $coreWxsPath -Raw
         $content = $content -replace 'Id="PTConf.psd1" />', 'Id="PTConf.psd1" Name="Microsoft.PowerToys.Configure.psd1" />'
         $content = $content -replace 'Id="PTConf.psm1" />', 'Id="PTConf.psm1" Name="Microsoft.PowerToys.Configure.psm1" />'
         Set-Content -Path $coreWxsPath -Value $content -NoNewline
-        Write-Host "Patched $coreWxsPath with explicit Name attributes"
+        Write-Host "Patched Core.wxs with explicit Name attributes"
 
     - name: Build Installer - Machine MSI
       shell: pwsh

@@ -125,12 +125,12 @@ function BuildProjectsInDirectory {
     $names = ($files | ForEach-Object { $_.Name }) -join ', '
     Write-Host ("[LOCAL BUILD] Found {0} project(s) in {1}: {2}" -f $files.Count, $DirectoryPath, $names)
 
-    $preferredOrder = @('.sln', '.csproj', '.vcxproj')
+    $preferredOrder = @('.sln', '.slnx', '.csproj', '.vcxproj')
     $files = $files | Sort-Object @{Expression = { [array]::IndexOf($preferredOrder, $_.Extension.ToLower()) }}
 
     foreach ($f in $files) {
         Write-Host ("[LOCAL BUILD] Building {0}" -f $f.FullName)
-        if ($f.Extension -eq '.sln') {
+        if ($f.Extension -eq '.sln' -or $f.Extension -eq '.slnx') {
             RestoreThenBuild $f.FullName $ExtraArgs $Platform $Configuration $RestoreOnly
         } else {
             $buildArgs = '/m'
@@ -195,11 +195,13 @@ function Ensure-VsDevEnvironment {
 
     $instPaths = @()
     if ($vswhere) {
-        # First try with the VC tools requirement (preferred)
-        try { $p = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null; if ($p) { $instPaths += $p } } catch {}
+        # Prefer VS instances that can build native + managed projects. When multiple instances exist,
+        # try full Visual Studio instances before "BuildTools" to avoid missing components.
+        try { $pAll = & $vswhere -all -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null; if ($pAll) { $instPaths += $pAll } } catch {}
+
         # Fallback: try without -requires to find any VS installations
         if (-not $instPaths) {
-            try { $p2 = & $vswhere -latest -products * -property installationPath 2>$null; if ($p2) { $instPaths += $p2 } } catch {}
+            try { $pAll2 = & $vswhere -all -products * -property installationPath 2>$null; if ($pAll2) { $instPaths += $pAll2 } } catch {}
         }
     }
 
@@ -220,6 +222,12 @@ function Ensure-VsDevEnvironment {
         Write-Warning "[VS] Could not locate Visual Studio installation (no candidates found)"
         return $false
     }
+
+    $instPaths = $instPaths | Where-Object { $_ } | Select-Object -Unique
+    $instPaths = $instPaths | Sort-Object @(
+        @{ Expression = { if ($_ -match '\\\\BuildTools($|\\\\)') { 2 } elseif ($_ -match '\\\\Preview($|\\\\)') { 1 } else { 0 } } ; Ascending = $true },
+        @{ Expression = { $_ } ; Ascending = $true }
+    )
 
     # Try each candidate installation path until one works
     foreach ($inst in $instPaths) {

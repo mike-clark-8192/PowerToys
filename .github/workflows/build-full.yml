@@ -15,7 +15,7 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 120
     name: Build x64 Release + Installer
 
@@ -42,6 +42,24 @@ jobs:
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
+
+    - name: Diagnostics (MSBuild / VS)
+      shell: pwsh
+      run: |
+        Write-Host "=== MSBuild on PATH ==="
+        where.exe msbuild.exe
+        msbuild.exe -version
+
+        Write-Host "`n=== VS instances (vswhere) ==="
+        $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+        if (Test-Path $vswhere) {
+          & $vswhere -all -products * -property installationPath
+        } else {
+          Write-Host "vswhere not found at: $vswhere"
+        }
+
+        Write-Host "`n=== Solution header ==="
+        Get-Content PowerToys.slnx -TotalCount 5
 
     - name: Install Windows SDK 10.0.19041.0
       shell: pwsh
@@ -82,7 +100,57 @@ jobs:
       run: |
         # Build using PowerToys' official build script
         # CIBuild=true skips post-build steps that execute binaries
-        ./tools/build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Platform $env:BUILD_PLATFORM '/p:CIBuild=true'
+        $consoleLog = Join-Path $env:GITHUB_WORKSPACE "build.powershell.console.log"
+        pwsh -NoProfile -File ./tools/build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Platform $env:BUILD_PLATFORM '/p:CIBuild=true' 2>&1 |
+          Tee-Object -FilePath $consoleLog
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Detect token recognition errors
+      id: token_errors
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Continue'
+        $files = @(
+          "build.powershell.console.log",
+          "build.$($env:BUILD_CONFIGURATION.ToLower()).$($env:BUILD_PLATFORM.ToLower()).all.log",
+          "build.$($env:BUILD_CONFIGURATION.ToLower()).$($env:BUILD_PLATFORM.ToLower()).errors.log",
+          "build.$($env:BUILD_CONFIGURATION.ToLower()).$($env:BUILD_PLATFORM.ToLower()).warnings.log"
+        ) | ForEach-Object { Join-Path $env:GITHUB_WORKSPACE $_ }
+
+        $found = $false
+        foreach ($f in $files) {
+          if (-not (Test-Path $f)) { continue }
+          if (Select-String -Path $f -SimpleMatch "token recognition error" -Quiet) {
+            $found = $true
+            break
+          }
+        }
+
+        "found=$found" >> $env:GITHUB_OUTPUT
+
+        if ($found) {
+          Write-Host "::warning::Detected 'token recognition error' in MSBuild logs. Uploading binlog/logs for investigation."
+          foreach ($f in $files) {
+            if (Test-Path $f) {
+              Write-Host "---- $f (first 30 matches) ----"
+              Select-String -Path $f -SimpleMatch "token recognition error" | Select-Object -First 30 | ForEach-Object { Write-Host $_.Line }
+            }
+          }
+        } else {
+          Write-Host "No 'token recognition error' found in local MSBuild logs."
+        }
+
+    - name: Upload MSBuild logs (token recognition errors)
+      if: steps.token_errors.outputs.found == 'True'
+      uses: actions/upload-artifact@v4
+      with:
+        name: msbuild-logs-${{ env.BUILD_PLATFORM }}-${{ env.BUILD_CONFIGURATION }}
+        path: |
+          build.powershell.console.log
+          build.*.${{ env.BUILD_PLATFORM }}.all.log
+          build.*.${{ env.BUILD_PLATFORM }}.errors.log
+          build.*.${{ env.BUILD_PLATFORM }}.warnings.log
+          build.*.${{ env.BUILD_PLATFORM }}.trace.binlog
 
     - name: Build BugReportTool
       shell: pwsh

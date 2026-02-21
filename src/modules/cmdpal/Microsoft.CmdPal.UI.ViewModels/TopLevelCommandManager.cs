@@ -13,6 +13,7 @@ using Microsoft.CmdPal.Core.Common.Helpers;
 using Microsoft.CmdPal.Core.Common.Services;
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
+using Microsoft.CmdPal.UI.ViewModels.Services;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,10 +22,12 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class TopLevelCommandManager : ObservableObject,
     IRecipient<ReloadCommandsMessage>,
+    IRecipient<PinCommandItemMessage>,
     IPageContext,
     IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
+    private readonly ICommandProviderCache _commandProviderCache;
     private readonly TaskScheduler _taskScheduler;
 
     private readonly List<CommandProviderWrapper> _builtInCommands = [];
@@ -34,11 +37,13 @@ public partial class TopLevelCommandManager : ObservableObject,
 
     TaskScheduler IPageContext.Scheduler => _taskScheduler;
 
-    public TopLevelCommandManager(IServiceProvider serviceProvider)
+    public TopLevelCommandManager(IServiceProvider serviceProvider, ICommandProviderCache commandProviderCache)
     {
         _serviceProvider = serviceProvider;
+        _commandProviderCache = commandProviderCache;
         _taskScheduler = _serviceProvider.GetService<TaskScheduler>()!;
         WeakReferenceMessenger.Default.Register<ReloadCommandsMessage>(this);
+        WeakReferenceMessenger.Default.Register<PinCommandItemMessage>(this);
         _reloadCommandsGate = new(ReloadAllCommandsAsyncCore);
     }
 
@@ -319,7 +324,7 @@ public partial class TopLevelCommandManager : ObservableObject,
         try
         {
             await extension.StartExtensionAsync().WaitAsync(TimeSpan.FromSeconds(10));
-            return new CommandProviderWrapper(extension, _taskScheduler);
+            return new CommandProviderWrapper(extension, _taskScheduler, _commandProviderCache);
         }
         catch (Exception ex)
         {
@@ -410,6 +415,21 @@ public partial class TopLevelCommandManager : ObservableObject,
 
     public void Receive(ReloadCommandsMessage message) =>
         ReloadAllCommandsAsync().ConfigureAwait(false);
+
+    public void Receive(PinCommandItemMessage message)
+    {
+        var wrapper = LookupProvider(message.ProviderId);
+        wrapper?.PinCommand(message.CommandId, _serviceProvider);
+    }
+
+    private CommandProviderWrapper? LookupProvider(string providerId)
+    {
+        lock (_commandProvidersLock)
+        {
+            return _builtInCommands.FirstOrDefault(w => w.ProviderId == providerId)
+                   ?? _extensionCommandProviders.FirstOrDefault(w => w.ProviderId == providerId);
+        }
+    }
 
     void IPageContext.ShowException(Exception ex, string? extensionHint)
     {

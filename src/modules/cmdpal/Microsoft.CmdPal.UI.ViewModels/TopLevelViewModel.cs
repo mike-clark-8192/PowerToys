@@ -1,10 +1,13 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ManagedCommon;
+using Microsoft.CmdPal.Core.Common.Helpers;
+using Microsoft.CmdPal.Core.Common.Text;
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Settings;
@@ -16,14 +19,15 @@ using WyHash;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
-public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IExtendedAttributesProvider
+[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IExtendedAttributesProvider, IPrecomputedListItem
 {
     private readonly SettingsModel _settings;
     private readonly ProviderSettings _providerSettings;
     private readonly IServiceProvider _serviceProvider;
     private readonly CommandItemViewModel _commandItemViewModel;
 
-    private readonly string _commandProviderId;
+    public CommandProviderContext ProviderContext { get; private set; }
 
     private string IdFromModel => IsFallback && !string.IsNullOrWhiteSpace(_fallbackId) ? _fallbackId : _commandItemViewModel.Command.Id;
 
@@ -33,6 +37,10 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
 
     private HotkeySettings? _hotkey;
     private IIconInfo? _initialIcon;
+
+    private FuzzyTargetCache _titleCache;
+    private FuzzyTargetCache _subtitleCache;
+    private FuzzyTargetCache _extensionNameCache;
 
     private CommandAlias? Alias { get; set; }
 
@@ -49,7 +57,7 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
 
     public CommandItemViewModel ItemViewModel => _commandItemViewModel;
 
-    public string CommandProviderId => _commandProviderId;
+    public string CommandProviderId => ProviderContext.ProviderId;
 
     ////// ICommandItem
     public string Title => _commandItemViewModel.Title;
@@ -176,11 +184,13 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         }
     }
 
+    public string ExtensionName => ExtensionHost.GetExtensionDisplayName() ?? string.Empty;
+
     public TopLevelViewModel(
         CommandItemViewModel item,
         bool isFallback,
         CommandPaletteHost extensionHost,
-        string commandProviderId,
+        CommandProviderContext commandProviderContext,
         SettingsModel settings,
         ProviderSettings providerSettings,
         IServiceProvider serviceProvider,
@@ -189,7 +199,7 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         _serviceProvider = serviceProvider;
         _settings = settings;
         _providerSettings = providerSettings;
-        _commandProviderId = commandProviderId;
+        ProviderContext = commandProviderContext;
         _commandItemViewModel = item;
 
         IsFallback = isFallback;
@@ -199,7 +209,7 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
             _fallbackId = fallback.Id;
         }
 
-        item.PropertyChanged += Item_PropertyChanged;
+        item.PropertyChangedBackground += Item_PropertyChanged;
 
         // UpdateAlias();
         // UpdateHotkey();
@@ -229,6 +239,15 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         if (!string.IsNullOrEmpty(e.PropertyName))
         {
             PropChanged?.Invoke(this, new PropChangedEventArgs(e.PropertyName));
+
+            if (e.PropertyName is nameof(CommandItemViewModel.Title) or nameof(CommandItemViewModel.Name))
+            {
+                _titleCache.Invalidate();
+            }
+            else if (e.PropertyName is nameof(CommandItemViewModel.Subtitle))
+            {
+                _subtitleCache.Invalidate();
+            }
 
             if (e.PropertyName is "IsInitialized" or nameof(CommandItemViewModel.Command))
             {
@@ -339,8 +358,8 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
     {
         // Use WyHash64 to generate stable ID hashes.
         // manually seeding with 0, so that the hash is stable across launches
-        var result = WyHash64.ComputeHash64(_commandProviderId + DisplayTitle + Title + Subtitle, seed: 0);
-        _generatedId = $"{_commandProviderId}{result}";
+        var result = WyHash64.ComputeHash64(CommandProviderId + DisplayTitle + Title + Subtitle, seed: 0);
+        _generatedId = $"{CommandProviderId}{result}";
     }
 
     private void DoOnUiThread(Action action)
@@ -419,5 +438,19 @@ public sealed partial class TopLevelViewModel : ObservableObject, IListItem, IEx
         {
             [WellKnownExtensionAttributes.DataPackage] = _commandItemViewModel?.DataPackage,
         };
+    }
+
+    public FuzzyTarget GetTitleTarget(IPrecomputedFuzzyMatcher matcher)
+        => _titleCache.GetOrUpdate(matcher, Title);
+
+    public FuzzyTarget GetSubtitleTarget(IPrecomputedFuzzyMatcher matcher)
+        => _subtitleCache.GetOrUpdate(matcher, Subtitle);
+
+    public FuzzyTarget GetExtensionNameTarget(IPrecomputedFuzzyMatcher matcher)
+        => _extensionNameCache.GetOrUpdate(matcher, ExtensionName);
+
+    private string GetDebuggerDisplay()
+    {
+        return ToString();
     }
 }

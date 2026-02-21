@@ -89,8 +89,8 @@ public partial class ListViewModel : PageViewModel, IDisposable
         }
     }
 
-    public ListViewModel(IListPage model, TaskScheduler scheduler, AppExtensionHost host)
-        : base(model, scheduler, host)
+    public ListViewModel(IListPage model, TaskScheduler scheduler, AppExtensionHost host, CommandProviderContext providerContext)
+        : base(model, scheduler, host, providerContext)
     {
         _model = new(model);
         EmptyContent = new(new(null), PageContext);
@@ -486,6 +486,11 @@ public partial class ListViewModel : PageViewModel, IDisposable
     {
         if (!item.SafeSlowInit())
         {
+            // Even if initialization fails, we need to hide any previously shown details
+            DoOnUiThread(() =>
+            {
+                WeakReferenceMessenger.Default.Send<HideDetailsMessage>();
+            });
             return;
         }
 

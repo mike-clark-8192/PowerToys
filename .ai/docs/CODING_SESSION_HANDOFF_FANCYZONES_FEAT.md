@@ -1,16 +1,16 @@
 # Coding Session Handoff — FancyZones Keyboard Shortcut QoL (Feature Only)
 
-Date: 2026-02-19  
+Date: 2026-02-21  
 Source: `C:\temp\fancyzones-trim.txt`, `C:\temp\fancyzones.txt`
 
 ## 1) Goal & Success Criteria
 
-**Mission:** Improve FancyZones Editor “quick key” assignment UX by adding per-layout shortcut dropdowns on **custom layout cards**, supporting swap behavior, and keeping ordering/sorting intuitive.
+**Mission:** Improve FancyZones Editor “quick key” assignment UX by adding per-layout shortcut selectors on **custom layout cards**, supporting swap behavior, and keeping ordering/sorting intuitive.
 
 **Success (observable):**
 - Custom layout cards show a shortcut selector (0–9 + None).
 - Selecting an already-assigned shortcut swaps assignments (silent).
-- Dropdown visually indicates assignments by suffixing entries with ` - {AssignedLayoutName}`.
+- Selector visually indicates assignments by suffixing entries with ` - {AssignedLayoutName}`.
 - Layout ordering: layouts-with-shortcuts first; layouts-without-shortcuts after (keeping existing ordering among unassigned), with no flicker.
 - Edit dialog supports the same shortcut UX without breaking Save/Cancel semantics.
 
@@ -21,8 +21,8 @@ Source: `C:\temp\fancyzones-trim.txt`, `C:\temp\fancyzones.txt`
 - **Sorting:** Unassigned layouts should sort after assigned ones; unassigned layouts should keep existing behavior/order among themselves.
 - **Swap feedback:** Silent (no toast/confirm).
 - **Visual indicator:** Selector entries should show assignment by suffixing with layout name.
-- **UI style:** Modern/minimal; start with a standard ComboBox; keyboard asset already exists elsewhere in the editor UI.
-- **Interaction detail:** ComboBox click bubbling to GridView `ItemClick` is acceptable.
+- **UI style:** Modern/minimal; started with a standard ComboBox, but switched to a compact button+popup list because the collapsed ComboBox was too wide for the available space on layout cards.
+- **Interaction detail:** Click bubbling to GridView `ItemClick` is acceptable.
 - **Localization:** Follow existing localization patterns.
 
 ## 3) Key Technical Context
@@ -48,11 +48,16 @@ Source: `C:\temp\fancyzones-trim.txt`, `C:\temp\fancyzones.txt`
 
 ### 4.3 Card UI (custom layout cards)
 
-- Add a keyboard icon + ComboBox at the bottom-right of the custom layout card template.
-- Bind:
+- Add a compact shortcut button at the bottom-right of the custom layout card template.
+  - `ToggleButton` shows a compact label (e.g., `2` or `—`) and a keyboard glyph.
+  - On click, opens a `Popup` containing a `ListBox` of `QuickKeyOptions` (with `DisplayText` including ` - {AssignedLayoutName}` suffixes).
+- Bind the popup list:
   - `ItemsSource` → shared `QuickKeyOptions`
   - `SelectedValue` → layout’s `QuickKey`
   - `SelectedValuePath="KeyValue"`, `DisplayMemberPath="DisplayText"`
+- Implementation notes:
+  - `Popup` does not inherit `DataContext`; set it from `PlacementTarget.DataContext`.
+  - Use a small converter (e.g., `QuickKeyToCompactDisplayConverter`) so the button shows only the compact key label.
 - Ensure AutomationProperties and tooltips follow localized resources patterns.
 
 ### 4.4 Swap/assign behavior
@@ -95,9 +100,10 @@ Approach described in transcript:
 - `src/modules/fancyzones/editor/FancyZonesEditor/Models/LayoutModel.cs`
   - Sorting helper property (e.g., `QuickKeySortOrder`)
 - `src/modules/fancyzones/editor/FancyZonesEditor/MainWindow.xaml`
-  - Card template ComboBox + edit dialog ComboBox changes
+  - Card template compact button + popup list + edit dialog ComboBox changes
 - `src/modules/fancyzones/editor/FancyZonesEditor/MainWindow.xaml.cs`
   - Card handler, swap logic, pending-key dialog logic, init guard
+- `src/modules/fancyzones/editor/FancyZonesEditor/Converters/QuickKeyToCompactDisplayConverter.cs` (new)
 - `src/modules/fancyzones/editor/FancyZonesEditor/App.xaml.cs`
   - Initialize refresh/sort after load
 
@@ -109,4 +115,3 @@ Approach described in transcript:
 - Open edit dialog, change key, press Cancel; verify no changes persisted.
 - Open edit dialog, change key, press Save; verify changes persist and swap rules apply.
 - Confirm layout ordering matches: assigned first; unassigned after; no flicker on startup.
-

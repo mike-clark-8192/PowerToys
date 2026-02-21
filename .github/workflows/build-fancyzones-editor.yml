@@ -1,6 +1,7 @@
 name: Build FancyZones Editor
 
 on:
+  workflow_dispatch:  # Allow manual trigger
   push:
     branches: [ feat/fancyzones-keyboard-shortcut-qol ]
     paths:

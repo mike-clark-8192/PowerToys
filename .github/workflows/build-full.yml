@@ -1,11 +1,11 @@
 name: Build Full PowerToys
 
 on:
-  push:
-    branches: [ feat/fancyzones-keyboard-shortcut-qol ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:  # Allow manual trigger
+  # push:
+  #   branches: [ feat/fancyzones-keyboard-shortcut-qol ]
+  # pull_request:
+  #   branches: [ main ]
 
 env:
   BUILD_PLATFORM: x64
@@ -61,26 +61,46 @@ jobs:
         Write-Host "`n=== Solution header ==="
         Get-Content PowerToys.slnx -TotalCount 5
 
-    - name: Install Windows SDK 10.0.19041.0
+    - name: Ensure Windows SDK 10.0.19041.0
       shell: pwsh
       run: |
-        # CsWinRT requires Windows SDK 10.0.19041.0 for TargetPlatformMinVersion validation
-        # Install the full SDK using winget (VS Installer component doesn't include full SDK)
-        Write-Host "Installing Windows SDK 10.0.19041.0 via winget..."
-        winget install Microsoft.WindowsSDK.10.0.19041 --silent --accept-package-agreements --accept-source-agreements
+        # CsWinRT validates TargetPlatformMinVersion against installed Windows SDK platform versions.
+        $sdkVersion = "10.0.19041.0"
+        $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\Platforms\UAP"
+        $sdkPath = Join-Path $sdkRoot $sdkVersion
 
-        # Give time for installation to complete
+        Write-Host "Checking for Windows SDK platform version: $sdkVersion"
+        if (Test-Path $sdkPath) {
+          Write-Host "Windows SDK platform $sdkVersion already present."
+          Get-ChildItem $sdkPath | Select-Object -First 10
+          exit 0
+        }
+
+        Write-Host "Windows SDK platform $sdkVersion not found at: $sdkPath"
+        Write-Host "Currently installed platform versions under: $sdkRoot"
+        Get-ChildItem $sdkRoot -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+          Write-Host "Installing Windows SDK $sdkVersion via winget..."
+          winget install Microsoft.WindowsSDK.10.0.19041 --silent --accept-package-agreements --accept-source-agreements
+        } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+          Write-Host "winget not available; installing Windows SDK via Chocolatey (windows-sdk-10.0)..."
+          choco install "windows-sdk-10.0" -y --no-progress
+        } else {
+          throw "Neither winget nor choco is available to install a Windows SDK."
+        }
+
         Start-Sleep -Seconds 10
 
-        Write-Host "Verifying SDK installation..."
-        $sdkPath = "C:\Program Files (x86)\Windows Kits\10\Platforms\UAP\10.0.19041.0"
+        Write-Host "Verifying Windows SDK platform version: $sdkVersion"
         if (Test-Path $sdkPath) {
-          Write-Host "SDK 10.0.19041.0 installed successfully"
-          Get-ChildItem $sdkPath
+          Write-Host "Windows SDK platform $sdkVersion is present."
+          Get-ChildItem $sdkPath | Select-Object -First 10
         } else {
-          Write-Host "Warning: SDK path not found at $sdkPath"
-          Write-Host "Available SDKs:"
-          Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Platforms\UAP\" -ErrorAction SilentlyContinue
+          Write-Host "SDK platform path still not found: $sdkPath"
+          Write-Host "Available platform versions:"
+          Get-ChildItem $sdkRoot -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+          exit 1
         }
 
     - name: Setup NuGet

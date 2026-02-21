@@ -29,11 +29,12 @@
     <Window.Resources>
         <Thickness x:Key="ContentDialogPadding">24,16,0,24</Thickness>
         <Thickness x:Key="ContentDialogCommandSpaceMargin">0,24,24,0</Thickness>
-        <Converters:LayoutModelTypeToVisibilityConverter x:Key="LayoutModelTypeToVisibilityConverter" />
-        <Converters:LayoutTypeCustomToVisibilityConverter x:Key="LayoutTypeCustomToVisibilityConverter" />
-        <Converters:LayoutTypeTemplateToVisibilityConverter x:Key="LayoutTypeTemplateToVisibilityConverter" />
-        <Converters:LayoutModelTypeBlankToVisibilityConverter x:Key="LayoutModelTypeBlankToVisibilityConverter" />
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+	        <Converters:LayoutModelTypeToVisibilityConverter x:Key="LayoutModelTypeToVisibilityConverter" />
+	        <Converters:LayoutTypeCustomToVisibilityConverter x:Key="LayoutTypeCustomToVisibilityConverter" />
+	        <Converters:LayoutTypeTemplateToVisibilityConverter x:Key="LayoutTypeTemplateToVisibilityConverter" />
+	        <Converters:LayoutModelTypeBlankToVisibilityConverter x:Key="LayoutModelTypeBlankToVisibilityConverter" />
+	        <Converters:QuickKeyToCompactDisplayConverter x:Key="QuickKeyToCompactDisplayConverter" />
+	        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
         <ContextMenu x:Key="LayoutContextMenu" Visibility="{Binding Path=Type, Converter={StaticResource LayoutModelTypeBlankToVisibilityConverter}}">
             <MenuItem Click="EditLayout_Click" Header="{x:Static props:Resources.Edit}">
@@ -175,33 +176,66 @@
                             Text="&#xE70F;" />
                     </Button.Content>
                 </Button>
-                <!--  Keyboard shortcut dropdown for custom layouts  -->
-                <StackPanel
+                <!--  Keyboard shortcut picker for custom layouts (compact button + popup list)  -->
+                <Grid
                     HorizontalAlignment="Right"
                     VerticalAlignment="Bottom"
                     Margin="0,0,8,8"
-                    Orientation="Horizontal"
                     Visibility="{Binding Path=Type, Converter={StaticResource LayoutTypeCustomToVisibilityConverter}}">
-                    <TextBlock
-                        Margin="0,0,4,0"
-                        VerticalAlignment="Center"
-                        AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
-                        FontFamily="{DynamicResource SymbolThemeFontFamily}"
-                        FontSize="14"
-                        Foreground="{Binding (TextElement.Foreground), RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ContentPresenter}}}"
-                        Text="&#xEDA7;"
-                        ToolTip="{x:Static props:Resources.QuickKey_Title}" />
-                    <ComboBox
-                        MinWidth="50"
+                    <ToggleButton
+                        x:Name="QuickKeyButton"
+                        Height="28"
+                        MinWidth="44"
+                        Padding="8,0"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ui:ControlHelper.CornerRadius="6"
                         AutomationProperties.HelpText="{x:Static props:Resources.QuickKey_Description}"
                         AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
-                        DisplayMemberPath="DisplayText"
-                        ItemsSource="{x:Static local:MainWindowSettingsModel.QuickKeyOptions}"
-                        SelectedValue="{Binding QuickKey}"
-                        SelectedValuePath="KeyValue"
-                        SelectionChanged="LayoutCard_QuickKeyChanged"
-                        ToolTip="{x:Static props:Resources.QuickKey_Title}" />
-                </StackPanel>
+                        ToolTip="{x:Static props:Resources.QuickKey_Title}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="{Binding QuickKey, Converter={StaticResource QuickKeyToCompactDisplayConverter}}" />
+                            <TextBlock
+                                Margin="6,0,0,0"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
+                                FontFamily="{DynamicResource SymbolThemeFontFamily}"
+                                FontSize="14"
+                                Text="&#xEDA7;" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <Popup
+                        x:Name="QuickKeyPopup"
+                        AllowsTransparency="True"
+                        DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                        IsOpen="{Binding IsChecked, ElementName=QuickKeyButton}"
+                        Placement="Top"
+                        PlacementTarget="{Binding ElementName=QuickKeyButton}"
+                        PopupAnimation="Fade"
+                        StaysOpen="False">
+                        <Border
+                            Padding="4"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            ui:ControlHelper.CornerRadius="6">
+                            <ListBox
+                                MinWidth="220"
+                                MaxHeight="260"
+                                AutomationProperties.Name="{x:Static props:Resources.QuickKey_Title}"
+                                DisplayMemberPath="DisplayText"
+                                ItemsSource="{x:Static local:MainWindowSettingsModel.QuickKeyOptions}"
+                                SelectedValue="{Binding QuickKey}"
+                                SelectedValuePath="KeyValue"
+                                SelectionChanged="LayoutCard_QuickKeyChanged" />
+                        </Border>
+                    </Popup>
+                </Grid>
             </Grid>
         </DataTemplate>
 

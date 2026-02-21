@@ -11,8 +11,10 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Common.UI;
 using FancyZoneEditor.Telemetry;
 using FancyZonesEditor.Models;
@@ -580,8 +582,8 @@ namespace FancyZonesEditor
                 return;
             }
 
-            var comboBox = sender as ComboBox;
-            var layout = comboBox?.DataContext as LayoutModel;
+            var selector = sender as Selector;
+            var layout = selector?.DataContext as LayoutModel;
             var newItem = e.AddedItems[0] as KeyDisplayItem;
             var oldItem = e.RemovedItems[0] as KeyDisplayItem;
 
@@ -604,8 +606,39 @@ namespace FancyZonesEditor
             // Re-sort custom layouts
             MainWindowSettingsModel.SortCustomLayouts();
 
+            // If this change came from the popup list on a layout card, close it after selection.
+            if (sender is ListBox listBox)
+            {
+                var popup = FindVisualParent<Popup>(listBox);
+                if (popup?.PlacementTarget is ToggleButton toggleButton)
+                {
+                    toggleButton.IsChecked = false;
+                }
+                else if (popup != null)
+                {
+                    popup.IsOpen = false;
+                }
+            }
+
             // Serialize immediately
             App.FancyZonesEditorIO.SerializeLayoutHotkeys();
+        }
+
+        private static T FindVisualParent<T>(DependencyObject child)
+            where T : DependencyObject
+        {
+            var current = child;
+            while (current != null)
+            {
+                if (current is T typed)
+                {
+                    return typed;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return null;
         }
 
         private void PerformShortcutSwap(LayoutModel layout, string oldKey, string newKey)

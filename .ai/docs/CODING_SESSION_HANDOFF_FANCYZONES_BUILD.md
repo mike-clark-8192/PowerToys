@@ -1,6 +1,6 @@
 # Coding Session Handoff — FancyZones/PowerToys Build & CI (Build Only)
 
-Date: 2026-02-19  
+Date: 2026-02-21  
 Source: `C:\temp\fancyzones-trim.txt`, `C:\temp\fancyzones.txt`
 
 ## 1) Goal
@@ -13,8 +13,8 @@ This doc originally summarized outcomes “per transcript”. The repo has since
 
 - FancyZonesEditor build in GitHub Actions: ✅ working (note: workflow is path-filtered; docs-only commits won’t trigger it)
 - Full PowerToys build in GitHub Actions (`Build Full PowerToys`): ✅ working for **x64 Release + Installer**
-  - Last completed success: 2026-01-10 (run `20883652363`, commit `e3dc996`)
-  - Latest run on docs commit: 2026-02-19 (run `22193718405`, commit `d2425ef`) — ✅ **completed success** (but prints “token recognition error at: ?” during `Build PowerToys`)
+  - Last completed success: 2026-02-19 (run `22193718405`, commit `d2425ef`) — ✅ **completed success** (but prints “token recognition error at: ?” during `Build PowerToys`)
+  - Latest run: 2026-02-21 (run `22251439984`, commit `c69432c`) — ❌ failed early because `winget` was not available on the `windows-2022` runner image (fixed in workflow by checking for the SDK first and falling back to Chocolatey when needed)
 
 ## 3) Key CI Learnings / Fixes
 
@@ -32,16 +32,19 @@ This doc originally summarized outcomes “per transcript”. The repo has since
   - Updated to run on `windows-2022` (pinning avoids `windows-latest` image churn)
   - Runs build essentials, then `msbuild` the FancyZonesEditor `.csproj` (x64 Debug)
 - `.github/workflows/build-full.yml` (working, **x64 Release + Installer**)
-  - Triggers on all pushes to `feat/fancyzones-keyboard-shortcut-qol`
+  - Triggered manually (`workflow_dispatch`) only (push/PR triggers commented out for now)
   - Updated to run on `windows-2022` (pinning avoids `windows-latest` image churn)
+  - Ensures a Windows SDK platform version is present for CsWinRT validation (uses `winget` if available, otherwise Chocolatey)
   - Restore: `nuget restore PowerToys.slnx -ConfigFile nuget.config`
   - Build: `./tools/build/build.ps1 -Configuration Release -Platform x64 '/p:CIBuild=true'`
   - Also builds BugReportTool + StylesReportTool and runs installer builds (WiX 5)
 
 ## 5) Current Status (workflows)
 
-- `Build FancyZones Editor`: ✅ last run succeeded on 2026-01-10 (not triggered by docs-only commit `d2425ef`)
-- `Build Full PowerToys`: ✅ latest run succeeded on 2026-02-19 (run `22193718405`, commit `d2425ef`), but includes “token recognition error at: ?” noise during `Build PowerToys`
+- `Build FancyZones Editor`: ✅ last run succeeded on 2026-02-21 (run `22251439996`, commit `c69432c`)
+- `Build Full PowerToys`: ✅ last success on 2026-02-19 (run `22193718405`, commit `d2425ef`), but includes “token recognition error at: ?” noise during `Build PowerToys`
+  - Latest run on 2026-02-21 failed before restore/build because `winget` was missing (run `22251439984`, commit `c69432c`)
+  - Note: workflow is now manual-only, so pushes will not trigger this automatically
 
 ## 6) Remaining Work (build-only)
 
@@ -50,7 +53,16 @@ The following were “still pending per transcript” items for a broader **matr
 - `src/modules/cmdpal/ext/ProcessMonitorExtension/Properties/PublishProfiles/win-arm64.pubxml`: add `CIBuild`-based conditions
 - `src/modules/cmdpal/ext/SamplePagesExtension/SamplePagesExtension.csproj`: disable `PublishAot` when `CIBuild=true`
 
-## 7) Repro Commands (CI-style)
+## 7) Local Build Shortcut (FancyZones-only)
+
+If you only need to rebuild FancyZones components locally (Editor + native projects), use:
+- `./tools/build/local-build-fancyzones.ps1 -Configuration Debug -Platform x64`
+
+Notes:
+- Defaults to `/p:EnableSourceControlManagerQueries=false` to avoid failures when the repo uses git reftable refs (`extensions.refstorage=reftable`).
+- Pass `-EnableSourceControlManagerQueries` to re-enable SourceLink/SCM queries.
+
+## 8) Repro Commands (CI-style)
 
 FancyZonesEditor-only:
 - `./tools/build/build-essentials.ps1 -Configuration Debug -Platform x64`
